@@ -9,8 +9,6 @@ Also you can use it for Arduino, ESP32, or any microcontroller, any version and 
 
 I will improve it as I test the devices.
 
-Thank you
-
+Thank you.
 Pablo Martikian
-
 5 Nov 2018
