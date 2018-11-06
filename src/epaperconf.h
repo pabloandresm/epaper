@@ -7,8 +7,8 @@
 
   Please include this text in any redistribution.
  ***************************************************************************/
-#ifndef __CONF_H
-#define __CONF_H
+#ifndef __EPAPERCONF_H
+#define __EPAPERCONF_H
 
 // milliseconds to wait for a valid reponse from commands
 #define EPAPER_REPONSE_TIMEOUT		5000
@@ -35,4 +35,4 @@
 
 #endif
 
-#endif /* __CONF_H */
+#endif /* __EPAPERCONF_H */
