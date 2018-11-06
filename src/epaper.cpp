@@ -13,8 +13,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define CMD_SIZE					512
-
 #define FRAME_B						0xA5
 #define FRAME_E0					0xCC
 #define FRAME_E1					0x33
@@ -114,7 +112,9 @@ epaper_fini(void)
 int
 epaper_write(unsigned char *v, int s)
 {
+//	int i;
 	if (epaper_fd<0) return -1;
+//	for (i=0;i<s;i++) printf("[%02X] ",(int)v[i]);
 	return write(epaper_fd,v,s);
 }
 
@@ -193,6 +193,7 @@ epaper_wait_error_getnumber(void)
 		if (epaper_read(&c)!=1) break;
 		n = n * 10 + (c-'0');
 	} while (1);
+	if (n == 0) return 88;	// redirect display error 0 to 88
 	return n;
 }
 
@@ -483,35 +484,38 @@ epaper_clear(void)
 int
 epaper_disp_string(const void * p, int x0, int y0)
 {
-	int string_size;
+	int strl;
+	int cmd_size;
 	unsigned char * ptr = (unsigned char *)p;
 
-
-	string_size = strlen((const char *)ptr);
-	string_size += 14;
-
+	strl = strlen((const char *)ptr) + 1;		// +1 to add the ending \0
+	if (strl+12 > CMD_SIZE) strl = CMD_SIZE-12;	// avoid buffer overflow
+	cmd_size = strl + 12 + 1;	// extra +1 for the checksum
 	_cmd_buff[0] = FRAME_B;
 
-	_cmd_buff[1] = (string_size >> 8) & 0xFF;
-	_cmd_buff[2] = string_size & 0xFF;
+	// size of the whole command
+	_cmd_buff[1] = (cmd_size >> 8) & 0xFF;
+	_cmd_buff[2] = cmd_size & 0xFF;
 
 	_cmd_buff[3] = CMD_DRAW_STRING;
 
+	// pos x
 	_cmd_buff[4] = (x0 >> 8) & 0xFF;
 	_cmd_buff[5] = x0 & 0xFF;
+	// pos y
 	_cmd_buff[6] = (y0 >> 8) & 0xFF;
 	_cmd_buff[7] = y0 & 0xFF;
 
-	strcpy((char *)(&_cmd_buff[8]), (const char *)ptr);
+	// string
+	memcpy((void *)(_cmd_buff+8),ptr,strl);
+	_cmd_buff[cmd_size-6] = 0;	// make sure the last char of the string is always \0
 
-	string_size -= 5;
+	_cmd_buff[cmd_size-5] = FRAME_E0;
+	_cmd_buff[cmd_size-4] = FRAME_E1;
+	_cmd_buff[cmd_size-3] = FRAME_E2;
+	_cmd_buff[cmd_size-2] = FRAME_E3;
 
-	_cmd_buff[string_size] = FRAME_E0;
-	_cmd_buff[string_size + 1] = FRAME_E1;
-	_cmd_buff[string_size + 2] = FRAME_E2;
-	_cmd_buff[string_size + 3] = FRAME_E3;
-
-	_sendcmd(_cmd_buff,string_size+4);
+	_sendcmd(_cmd_buff,cmd_size-1);
 	return epaper_wait_ok_error(0);
 }
 
@@ -526,9 +530,13 @@ epaper_disp_char(const char c, int x0, int y0)
 int
 epaper_disp_bitmap(const void * p, int x0, int y0)
 {
+	int strl;
 	int string_size;
 	char *ptr = (char *)p;
 	if (strchr(ptr,'.')==0) return 4;			// no extension =>>> error 4 (bug in firmware)
+
+	strl = strlen((const char *)ptr);
+	if (strl + 13 > CMD_SIZE) return 2;			// avoid buffer overflow of _cmd_buff
 
 	string_size = strlen((const char *)ptr);
 	string_size += 14;

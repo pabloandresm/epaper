@@ -10,7 +10,13 @@
 #ifndef __CONF_H
 #define __CONF_H
 
+// milliseconds to wait for a valid reponse from commands
 #define EPAPER_REPONSE_TIMEOUT		5000
+
+// Biggest command size (used for epaper_disp_string())
+// It will limit the size of the printed string.
+// In Arduino is useful to limit the RAM used by the library
+#define CMD_SIZE					128
 
 #ifndef __AVR__
 // for linux or cygwin

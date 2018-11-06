@@ -36,8 +36,22 @@ COLOR
 */
 #define EPAPER_WHITE				0x03
 #define EPAPER_GRAY					0x02
-#define EPAPER_DARK_GRAY			0x01
+#define EPAPER_DARK_GRAY		0x01
 #define EPAPER_BLACK				0x00
+
+/*
+ERROR CODES
+*/
+#define EPAPER_OK													0
+#define EPAPER_FAILED_TFCARD_INIT					1
+#define EPAPER_INVALID_PARAMETERS					2
+#define EPAPER_TFCARD_NOT_FOUND						3
+#define EPAPER_FILE_NOT_FOUND							4
+#define EPAPER_CHECKSUM_FAILED						20
+#define EPAPER_INVALID_FRAME_FORMAT				21
+#define EPAPER_UNDEFINED_ERROR						250
+// display error code 0 redirected to 88
+#define EPAPER_INVALID_COMMAND						88
 
 #ifdef __AVR__
 extern void epaper_reset(void);					// linux or cygwin don't connect this pin, so it will not be possible to reset
