@@ -48,7 +48,7 @@
 
 #define CMD_DRAW_STRING				0x30
 
-#define    CMD_DRAW_BITMAP			0x70
+#define CMD_DRAW_BITMAP				0x70
 
 #ifndef __AVR__							// linux or cygwin
 #include "linux_arduino_wrapper.h"		// wrapper to emulate millis() / delay() / and Serial.
@@ -131,6 +131,7 @@ epaper_read(char *c)
 #ifdef __AVR__
 
 #include <Arduino.h>
+#include <WString.h>
 
 #define epaper_write(v,s)	EINK_SERIAL.write(v,s)
 
@@ -142,9 +143,21 @@ epaper_read(char *c)
 	cc = EINK_SERIAL.read();
 	if (cc==-1) return -1;
 	*c = (char)cc;
-   	Serial.print((char)cc);
+   	//Serial.print((char)cc);
 	return 1;
 }
+
+int
+epaper_init(void)
+{
+	EINK_SERIAL.begin(115200);
+	pinMode(PIN_EINK_RST,OUTPUT);
+	digitalWrite(PIN_EINK_RST, LOW);
+	pinMode(PIN_EINK_WAKEUP,OUTPUT);
+	digitalWrite(PIN_EINK_WAKEUP, LOW);
+	return 1;
+}
+
 #endif
 
 #if 0
@@ -254,8 +267,9 @@ epaper_wakeup(void)
 	int retries = EPAPER_REPONSE_TIMEOUT / 1000;
 	do {
 		epaper_wakeup_internal();
+		delay(500);
 		if (epaper_handshake()==0) return 0;
-		delay(1000);
+		delay(500);
 		retries--;
 		} while (retries>0);
 	return -1;
@@ -266,23 +280,23 @@ epaper_wakeup(void)
 void
 epaper_sleep(void)
 {
-	unsigned char _cmd_stopmode[8] = {0xA5, 0x00, 0x09, CMD_STOPMODE, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_stopmode,8);
+	const unsigned char _cmd_stopmode[8] = {0xA5, 0x00, 0x09, CMD_STOPMODE, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_stopmode,8);
 }
 
 int
 epaper_update(void)
 {
-	unsigned char _cmd_update[8] = {0xA5, 0x00, 0x09, CMD_UPDATE, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_update, 8);
+	const unsigned char _cmd_update[8] = {0xA5, 0x00, 0x09, CMD_UPDATE, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_update, 8);
 	return epaper_wait_ok_error(0);
 }
 
 int
 epaper_handshake(void)
 {
-	unsigned char _cmd_handshake[8] = {0xA5, 0x00, 0x09, CMD_HANDSHAKE, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_handshake, 8);
+	const unsigned char _cmd_handshake[8] = {0xA5, 0x00, 0x09, CMD_HANDSHAKE, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_handshake, 8);
 	return epaper_wait_ok_error(0);
 }
 
@@ -304,8 +318,8 @@ epaper_read_baud(void)
 {
 	int x;
 	char buf[8] = {0,0,0,0,0,0,0,0};
-	unsigned char _cmd_read_baud[8] = {0xA5, 0x00, 0x09, CMD_READ_BAUD, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_read_baud, 8);
+	const unsigned char _cmd_read_baud[8] = {0xA5, 0x00, 0x09, CMD_READ_BAUD, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_read_baud, 8);
 	delay(500);	// half a second
 	for (x=0;x<7;x++)
 		if (1==epaper_read(buf+x)) continue;
@@ -317,8 +331,8 @@ int
 epaper_get_memory(void)
 {
 	char c;
-	unsigned char _cmd_get_memorymode[8] = {0xA5, 0x00, 0x09, CMD_GET_MEMORYMODE, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_get_memorymode, 8);
+	const unsigned char _cmd_get_memorymode[8] = {0xA5, 0x00, 0x09, CMD_GET_MEMORYMODE, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_get_memorymode, 8);
 	delay(500);	// half a second
 	if (1==epaper_read(&c)) return c-'0';
 	return -1;
@@ -346,8 +360,8 @@ int
 epaper_get_screenrotation(void)
 {
 	char c;
-	unsigned char _cmd_get_screenrotation[8] = {0xA5, 0x00, 0x09, CMD_GET_SCREENROTATION, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_get_screenrotation, 8);
+	const unsigned char _cmd_get_screenrotation[8] = {0xA5, 0x00, 0x09, CMD_GET_SCREENROTATION, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_get_screenrotation, 8);
 	delay(500);	// half a second
 	if (1==epaper_read(&c)) return c-'0';
 	return -1;
@@ -367,8 +381,8 @@ int
 epaper_get_color(void)
 {
 	char c;
-	unsigned char _cmd_get_color[8] = {0xA5, 0x00, 0x09, CMD_GET_COLOR, 0xCC, 0x33, 0xC3, 0x3C};
-	_sendcmd(_cmd_get_color,8);
+	const unsigned char _cmd_get_color[8] = {0xA5, 0x00, 0x09, CMD_GET_COLOR, 0xCC, 0x33, 0xC3, 0x3C};
+	_sendcmd((unsigned char *)_cmd_get_color,8);
 	delay(500);	// half a second
 	if (1==epaper_read(&c)) return c-'0';
 	return -1;
@@ -377,19 +391,25 @@ epaper_get_color(void)
 int
 epaper_set_en_font(unsigned char font)
 {
+	int res;
 	unsigned char _cmd_set_en_font[9] = { FRAME_B, 0x00, 0x0A, CMD_SET_EN_FONT, 0, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_cmd_set_en_font[4] = font;
 	_sendcmd(_cmd_set_en_font, 9);
-	return epaper_wait_ok_error(0);
+	res = epaper_wait_ok_error(0);
+//	if (!res) CurrentFont = font;
+	return res;
 }
 
 int
 epaper_set_ch_font(unsigned char font)
 {
+	int res;
 	unsigned char _cmd_set_ch_font[9] = { FRAME_B, 0x00, 0x0A, CMD_SET_CH_FONT, 0, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_cmd_set_ch_font[4] = font;
 	_sendcmd(_cmd_set_ch_font, 9);
-	return epaper_wait_ok_error(0);
+	res = epaper_wait_ok_error(0);
+//	if (!res) CurrentFont = font;
+	return res;
 }
 
 int
@@ -476,8 +496,8 @@ epaper_triangle(int fill, int x0, int y0, int x1, int y1, int x2, int y2)
 int
 epaper_clear(void)
 {
-	unsigned char _cmd_clean[8] = {FRAME_B,0x00,0x09,CMD_CLEAR,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
-	_sendcmd(_cmd_clean,8);
+	const unsigned char _cmd_clean[8] = {FRAME_B,0x00,0x09,CMD_CLEAR,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
+	_sendcmd((unsigned char *)_cmd_clean,8);
 	return epaper_wait_ok_error(0);
 }
 
@@ -486,9 +506,8 @@ epaper_disp_string(const void * p, int x0, int y0)
 {
 	int strl;
 	int cmd_size;
-	unsigned char * ptr = (unsigned char *)p;
 
-	strl = strlen((const char *)ptr) + 1;		// +1 to add the ending \0
+	strl = strlen((const char *)p) + 1;		// +1 to add the ending \0
 	if (strl+12 > CMD_SIZE) strl = CMD_SIZE-12;	// avoid buffer overflow
 	cmd_size = strl + 12 + 1;	// extra +1 for the checksum
 	_cmd_buff[0] = FRAME_B;
@@ -507,7 +526,7 @@ epaper_disp_string(const void * p, int x0, int y0)
 	_cmd_buff[7] = y0 & 0xFF;
 
 	// string
-	memcpy((void *)(_cmd_buff+8),ptr,strl);
+	memcpy((void *)(_cmd_buff+8),p,strl);
 	_cmd_buff[cmd_size-6] = 0;	// make sure the last char of the string is always \0
 
 	_cmd_buff[cmd_size-5] = FRAME_E0;
@@ -518,6 +537,46 @@ epaper_disp_string(const void * p, int x0, int y0)
 	_sendcmd(_cmd_buff,cmd_size-1);
 	return epaper_wait_ok_error(0);
 }
+
+#ifdef __AVR__
+#include <avr/pgmspace.h>
+int
+epaper_disp_string(const __FlashStringHelper * p, int x0, int y0)
+{
+	int strl;
+	int cmd_size;
+
+	strl = strlen_P((PGM_P)p) + 1;		// +1 to add the ending \0
+	if (strl+12 > CMD_SIZE) strl = CMD_SIZE-12;	// avoid buffer overflow
+	cmd_size = strl + 12 + 1;	// extra +1 for the checksum
+	_cmd_buff[0] = FRAME_B;
+
+	// size of the whole command
+	_cmd_buff[1] = (cmd_size >> 8) & 0xFF;
+	_cmd_buff[2] = cmd_size & 0xFF;
+
+	_cmd_buff[3] = CMD_DRAW_STRING;
+
+	// pos x
+	_cmd_buff[4] = (x0 >> 8) & 0xFF;
+	_cmd_buff[5] = x0 & 0xFF;
+	// pos y
+	_cmd_buff[6] = (y0 >> 8) & 0xFF;
+	_cmd_buff[7] = y0 & 0xFF;
+
+	// string
+	memcpy_P((void *)(_cmd_buff+8),p,strl);
+	_cmd_buff[cmd_size-6] = 0;	// make sure the last char of the string is always \0
+
+	_cmd_buff[cmd_size-5] = FRAME_E0;
+	_cmd_buff[cmd_size-4] = FRAME_E1;
+	_cmd_buff[cmd_size-3] = FRAME_E2;
+	_cmd_buff[cmd_size-2] = FRAME_E3;
+
+	_sendcmd(_cmd_buff,cmd_size-1);
+	return epaper_wait_ok_error(0);
+}
+#endif
 
 int
 epaper_disp_char(const char c, int x0, int y0)
