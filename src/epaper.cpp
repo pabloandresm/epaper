@@ -44,11 +44,16 @@
 #define CMD_FILL_CIRCLE				0x27
 #define CMD_DRAW_TRIANGLE			0x28
 #define CMD_FILL_TRIANGLE			0x29
+#define CMD_DRAW_ARC				0x2D
 #define CMD_CLEAR					0x2E
+#define CMD_CLEAR_COLOR				0x2F
 
 #define CMD_DRAW_STRING				0x30
 
 #define CMD_DRAW_BITMAP				0x70
+
+#define CMD_SET_DRAWMODE      0x32
+
 
 #ifndef __AVR__							// linux or cygwin
 #include "linux_arduino_wrapper.h"		// wrapper to emulate millis() / delay() / and Serial.
@@ -178,6 +183,12 @@ epaper_dump(unsigned long long timeout)
 //static const unsigned char _cmd_load_font[8] = {0xA5, 0x00, 0x09, CMD_LOAD_FONT, 0xCC, 0x33, 0xC3, 0x3C};
 //static const unsigned char _cmd_load_pic[8] = {0xA5, 0x00, 0x09, CMD_LOAD_PIC, 0xCC, 0x33, 0xC3, 0x3C};
 
+
+static unsigned char global_bgcolor = -1;
+static unsigned char global_fgcolor = -1;
+static unsigned char global_en_font = -1;
+static unsigned char global_ch_font = -1;
+
 static unsigned char _cmd_buff[CMD_SIZE];
 
 static unsigned char _verify(const void * ptr, int n)
@@ -223,11 +234,23 @@ epaper_wait_ok_error(int with_enter)
             buf[x]=c;
 			if (with_enter) {
 				// for bitmap display there is a \n before the message
+#ifdef __AVR__
+   				if (memcmp_P(buf+1,F("\nError:"),7)==0) return epaper_wait_error_getnumber();
+#else
    				if (memcmp(buf+1,"\nError:",7)==0) return epaper_wait_error_getnumber();
+#endif
    	    		if ((buf[5]=='\n') && (buf[6]=='O') && (buf[7]=='K')) return 0;
+#ifdef __AVR__
+				if (memcmp_P(buf,F(" allowed"),8)==0) return 4;	// "Only .BMP .JPG .JPEG are allowed"
+#else
 				if (memcmp(buf," allowed",8)==0) return 4;	// "Only .BMP .JPG .JPEG are allowed"
+#endif
 				} else {
+#ifdef __AVR__
+					if (memcmp_P(buf+2,F("Error:"),6)==0) return epaper_wait_error_getnumber();
+#else
 					if (memcmp(buf+2,"Error:",6)==0) return epaper_wait_error_getnumber();
+#endif
             		if ((buf[6]=='O') && (buf[7]=='K')) return 0;
 					}
             } else delay(1);    // 1 millisecond
@@ -280,14 +303,14 @@ epaper_wakeup(void)
 void
 epaper_sleep(void)
 {
-	const unsigned char _cmd_stopmode[8] = {0xA5, 0x00, 0x09, CMD_STOPMODE, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_stopmode[8] = {FRAME_B, 0x00, 0x09, CMD_STOPMODE, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_stopmode,8);
 }
 
 int
 epaper_update(void)
 {
-	const unsigned char _cmd_update[8] = {0xA5, 0x00, 0x09, CMD_UPDATE, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_update[8] = {FRAME_B, 0x00, 0x09, CMD_UPDATE, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_update, 8);
 	return epaper_wait_ok_error(0);
 }
@@ -295,7 +318,7 @@ epaper_update(void)
 int
 epaper_handshake(void)
 {
-	const unsigned char _cmd_handshake[8] = {0xA5, 0x00, 0x09, CMD_HANDSHAKE, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_handshake[8] = {FRAME_B, 0x00, 0x09, CMD_HANDSHAKE, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_handshake, 8);
 	return epaper_wait_ok_error(0);
 }
@@ -318,7 +341,7 @@ epaper_read_baud(void)
 {
 	int x;
 	char buf[8] = {0,0,0,0,0,0,0,0};
-	const unsigned char _cmd_read_baud[8] = {0xA5, 0x00, 0x09, CMD_READ_BAUD, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_read_baud[8] = {FRAME_B, 0x00, 0x09, CMD_READ_BAUD, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_read_baud, 8);
 	delay(500);	// half a second
 	for (x=0;x<7;x++)
@@ -331,7 +354,7 @@ int
 epaper_get_memory(void)
 {
 	char c;
-	const unsigned char _cmd_get_memorymode[8] = {0xA5, 0x00, 0x09, CMD_GET_MEMORYMODE, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_get_memorymode[8] = {FRAME_B, 0x00, 0x09, CMD_GET_MEMORYMODE, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_get_memorymode, 8);
 	delay(500);	// half a second
 	if (1==epaper_read(&c)) return c-'0';
@@ -357,10 +380,19 @@ epaper_set_screenrotation(unsigned char mode)
 }
 
 int
+epaper_set_drawmode(unsigned char mode)
+{
+	unsigned char _cmd_set_drawmode[9] = {FRAME_B, 0x00, 0x0A, CMD_SET_DRAWMODE, 0, FRAME_E0, FRAME_E1, FRAME_E2, FRAME_E3};
+	_cmd_set_drawmode[4] = mode;
+	_sendcmd(_cmd_set_drawmode, 9);
+	return epaper_wait_ok_error(0);
+}
+
+int
 epaper_get_screenrotation(void)
 {
 	char c;
-	const unsigned char _cmd_get_screenrotation[8] = {0xA5, 0x00, 0x09, CMD_GET_SCREENROTATION, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_get_screenrotation[8] = {FRAME_B, 0x00, 0x09, CMD_GET_SCREENROTATION, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_get_screenrotation, 8);
 	delay(500);	// half a second
 	if (1==epaper_read(&c)) return c-'0';
@@ -368,11 +400,14 @@ epaper_get_screenrotation(void)
 }
 
 int
-epaper_set_color(unsigned char color, unsigned char bkcolor)
+epaper_set_color(unsigned char colour, unsigned char bkcolour)
 {
 	unsigned char _cmd_set_color[10] = { FRAME_B, 0x00, 0x0B, CMD_SET_COLOR, 0,0,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
-	_cmd_set_color[4]= color;
-	_cmd_set_color[5]= bkcolor;
+	if ((colour==global_fgcolor) && (bkcolour==global_bgcolor)) return 0;
+	global_fgcolor = colour;
+	global_bgcolor = bkcolour;
+	_cmd_set_color[4]= colour;
+	_cmd_set_color[5]= bkcolour;
 	_sendcmd(_cmd_set_color,10);
 	return epaper_wait_ok_error(0);
 }
@@ -381,7 +416,7 @@ int
 epaper_get_color(void)
 {
 	char c;
-	const unsigned char _cmd_get_color[8] = {0xA5, 0x00, 0x09, CMD_GET_COLOR, 0xCC, 0x33, 0xC3, 0x3C};
+	const unsigned char _cmd_get_color[8] = {FRAME_B, 0x00, 0x09, CMD_GET_COLOR, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_get_color,8);
 	delay(500);	// half a second
 	if (1==epaper_read(&c)) return c-'0';
@@ -393,6 +428,8 @@ epaper_set_en_font(unsigned char font)
 {
 	int res;
 	unsigned char _cmd_set_en_font[9] = { FRAME_B, 0x00, 0x0A, CMD_SET_EN_FONT, 0, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
+	if (global_en_font==font) return 0;
+	global_en_font = font;
 	_cmd_set_en_font[4] = font;
 	_sendcmd(_cmd_set_en_font, 9);
 	res = epaper_wait_ok_error(0);
@@ -405,6 +442,8 @@ epaper_set_ch_font(unsigned char font)
 {
 	int res;
 	unsigned char _cmd_set_ch_font[9] = { FRAME_B, 0x00, 0x0A, CMD_SET_CH_FONT, 0, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
+	if (global_ch_font==font) return 0;
+	global_ch_font = font;
 	_cmd_set_ch_font[4] = font;
 	_sendcmd(_cmd_set_ch_font, 9);
 	res = epaper_wait_ok_error(0);
@@ -473,6 +512,18 @@ epaper_circle(int fill, int x0, int y0, int r)
 }
 
 int
+epaper_circle_width_inner(int x0, int y0, int r, int width_inner)
+{
+	int x;
+	int res;
+	for (x=width_inner;x>0;x--) {
+		res = epaper_circle(0,x0,y0,r-x+1);			// +1 because width_inner=0 means 1 pixel width
+		if (res) return res;
+		}
+	return EPAPER_OK;
+}
+
+int
 epaper_triangle(int fill, int x0, int y0, int x1, int y1, int x2, int y2)
 {
 	unsigned char _cmd_triangle[20]={FRAME_B,0x00,0x15,CMD_FILL_TRIANGLE,0,0,0,0,0,0,0,0,0,0,0,0,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
@@ -494,10 +545,41 @@ epaper_triangle(int fill, int x0, int y0, int x1, int y1, int x2, int y2)
 }
 
 int
+epaper_draw_arc(int x0, int y0, int rx, int a0, int a1)
+{
+	unsigned char _cmd_draw_arc[20]={FRAME_B,0x00,0x15,CMD_DRAW_ARC,0,0,0,0,0,0,0,0,0,0,0,0,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
+	_cmd_draw_arc[4] = (x0 >> 8) & 0xFF;
+	_cmd_draw_arc[5] = x0 & 0xFF;
+	_cmd_draw_arc[6] = (y0 >> 8) & 0xFF;
+	_cmd_draw_arc[7] = y0 & 0xFF;
+	_cmd_draw_arc[8] = (rx >> 8) & 0xFF;
+	_cmd_draw_arc[9] = rx & 0xFF;
+/*	_cmd_draw_arc[10] = (ry >> 8) & 0xFF;
+	_cmd_draw_arc[11] = ry & 0xFF;*/
+	_cmd_draw_arc[10] = (rx >> 8) & 0xFF;
+	_cmd_draw_arc[11] = rx & 0xFF;
+	_cmd_draw_arc[12] = (a0 >> 8) & 0xFF;
+	_cmd_draw_arc[13] = a0 & 0xFF;
+	_cmd_draw_arc[14] = (a1 >> 8) & 0xFF;
+	_cmd_draw_arc[15] = a1 & 0xFF;
+	_sendcmd(_cmd_draw_arc,20);
+	return epaper_wait_ok_error(0);
+}
+
+int
 epaper_clear(void)
 {
 	const unsigned char _cmd_clean[8] = {FRAME_B,0x00,0x09,CMD_CLEAR,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	_sendcmd((unsigned char *)_cmd_clean,8);
+	return epaper_wait_ok_error(0);
+}
+
+int
+epaper_clear_color(int c)
+{
+	unsigned char _cmd_clean_color[9] = {FRAME_B,0x00,0x09,CMD_CLEAR_COLOR,0,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
+	_cmd_clean_color[4]=c;
+	_sendcmd((unsigned char *)_cmd_clean_color,9);
 	return epaper_wait_ok_error(0);
 }
 
@@ -538,8 +620,18 @@ epaper_disp_string(const void * p, int x0, int y0)
 	return epaper_wait_ok_error(0);
 }
 
+int
+epaper_disp_string_penwidth(const void * p, int x0, int y0, int w)
+{
+  int x,y,res=0;
+  for (x=0;x<w;x++) for (y=0;y<w;y++) {
+    res = epaper_disp_string(p,x0+x,y0+y);
+    if (res) return res;
+    }
+  return res;
+}
+
 #ifdef __AVR__
-#include <avr/pgmspace.h>
 int
 epaper_disp_string(const __FlashStringHelper * p, int x0, int y0)
 {
@@ -576,6 +668,17 @@ epaper_disp_string(const __FlashStringHelper * p, int x0, int y0)
 	_sendcmd(_cmd_buff,cmd_size-1);
 	return epaper_wait_ok_error(0);
 }
+
+int
+epaper_disp_string_penwidth(const __FlashStringHelper * p, int x0, int y0, int w)
+{
+  int x,y,res=0;
+  for (x=0;x<w;x++) for (y=0;y<w;y++) {
+    res = epaper_disp_string((const __FlashStringHelper *)p,x0+x,y0+y);
+    if (res) return res;
+    }
+  return res;
+}
 #endif
 
 int
@@ -591,13 +694,12 @@ epaper_disp_bitmap(const void * p, int x0, int y0)
 {
 	int strl;
 	int string_size;
-	char *ptr = (char *)p;
-	if (strchr(ptr,'.')==0) return 4;			// no extension =>>> error 4 (bug in firmware)
+	if (strchr((const char *)p,'.')==0) return 4;			// no extension =>>> error 4 (bug in firmware)
 
-	strl = strlen((const char *)ptr);
+	strl = strlen((const char *)p);
 	if (strl + 13 > CMD_SIZE) return 2;			// avoid buffer overflow of _cmd_buff
 
-	string_size = strlen((const char *)ptr);
+	string_size = strlen((const char *)p);
 	string_size += 14;
 
 	_cmd_buff[0] = FRAME_B;
@@ -612,7 +714,7 @@ epaper_disp_bitmap(const void * p, int x0, int y0)
 	_cmd_buff[6] = (y0 >> 8) & 0xFF;
 	_cmd_buff[7] = y0 & 0xFF;
 
-	strcpy((char *)(&_cmd_buff[8]), (const char *)ptr);
+	strcpy((char *)(&_cmd_buff[8]), (const char *)p);
 
 	string_size -= 5;
 
@@ -624,3 +726,43 @@ epaper_disp_bitmap(const void * p, int x0, int y0)
 	_sendcmd(_cmd_buff,string_size+4);
 	return epaper_wait_ok_error(1);
 }
+
+#ifdef __AVR__
+int
+epaper_disp_bitmap(const __FlashStringHelper * p, int x0, int y0)
+{
+	int strl;
+	int string_size;
+	if (strchr_P((PGM_P)p,'.')==0) return 4;			// no extension =>>> error 4 (bug in firmware)
+
+	strl = strlen_P((PGM_P)p);
+	if (strl + 13 > CMD_SIZE) return 2;			// avoid buffer overflow of _cmd_buff
+
+	string_size = strlen_P((PGM_P)p);
+	string_size += 14;
+
+	_cmd_buff[0] = FRAME_B;
+
+	_cmd_buff[1] = (string_size >> 8) & 0xFF;
+	_cmd_buff[2] = string_size & 0xFF;
+
+	_cmd_buff[3] = CMD_DRAW_BITMAP;
+
+	_cmd_buff[4] = (x0 >> 8) & 0xFF;
+	_cmd_buff[5] = x0 & 0xFF;
+	_cmd_buff[6] = (y0 >> 8) & 0xFF;
+	_cmd_buff[7] = y0 & 0xFF;
+
+	strcpy_P((char *)(&_cmd_buff[8]),(PGM_P)p);
+
+	string_size -= 5;
+
+	_cmd_buff[string_size] = FRAME_E0;
+	_cmd_buff[string_size + 1] = FRAME_E1;
+	_cmd_buff[string_size + 2] = FRAME_E2;
+	_cmd_buff[string_size + 3] = FRAME_E3;
+
+	_sendcmd(_cmd_buff,string_size+4);
+	return epaper_wait_ok_error(1);
+}
+#endif

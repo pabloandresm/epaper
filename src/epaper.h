@@ -32,6 +32,12 @@ SCREEN ROTATION
 #define EPD_270						3
 
 /*
+DRAW MODE
+*/
+#define GUI_DRAWMODE_NORMAL    0
+#define GUI_DRAWMODE_TRANS     1
+
+/*
 COLOR
 */
 #define EPAPER_WHITE				0x03
@@ -54,6 +60,9 @@ ERROR CODES
 #define EPAPER_INVALID_COMMAND						88
 
 #ifdef __AVR__
+#include <WString.h>
+#include <avr/pgmspace.h>
+
 extern void epaper_reset(void);					// linux or cygwin don't connect this pin, so it will not be possible to reset
 extern int epaper_wakeup(void);					// linux or cygwin don't connect this pin, so it will not be possible to wakeup
 #else			// for linux or cygwin
@@ -72,6 +81,7 @@ extern int epaper_read_baud(void);
 extern int epaper_set_memory(unsigned char mode);
 extern int epaper_get_memory(void);
 extern int epaper_set_screenrotation(unsigned char mode);
+extern int epaper_set_drawmode(unsigned char mode);
 extern int epaper_get_screenrotation(void);
 extern int epaper_set_color(unsigned char color, unsigned char bkcolor);
 extern int epaper_get_color(void);
@@ -81,16 +91,20 @@ extern int epaper_draw_pixel(int x0, int y0);
 extern int epaper_draw_line(int x0, int y0, int x1, int y1);
 extern int epaper_rect(int fill, int x0, int y0, int x1, int y1);
 extern int epaper_circle(int fill, int x0, int y0, int r);
+extern int epaper_circle_width_inner(int x0, int y0, int r, int width_inner);		// calls epaper_circle() with fill=0, with multiple r to make width
 extern int epaper_triangle(int fill, int x0, int y0, int x1, int y1, int x2, int y2);
-extern int epaper_clear(void);
-extern int epaper_disp_string(const void * p, int x0, int y0);
-#ifdef __AVR__
-#include <WString.h>
-#include <avr/pgmspace.h>
-extern int epaper_disp_string(const __FlashStringHelper * p, int x0, int y0);
-#endif
+extern int epaper_draw_arc(int x0, int y0, int rx, int a0, int a1);			// NEW COMMAND
+extern int epaper_clear(void);														// fill screen using background color
+extern int epaper_clear_color(int c);												// fill screen with parameter color
 extern int epaper_disp_char(const char c, int x0, int y0);
+extern int epaper_disp_string(const void * p, int x0, int y0);
+extern int epaper_disp_string_penwidth(const void * p, int x0, int y0, int w);                    // use epaper_set_drawmode(GUI_DRAWMODE_TRANS) before
 extern int epaper_disp_bitmap(const void * p, int x0, int y0);
+#ifdef __AVR__
+extern int epaper_disp_string(const __FlashStringHelper * p, int x0, int y0);
+extern int epaper_disp_string_penwidth(const __FlashStringHelper * p, int x0, int y0, int w);     // use epaper_set_drawmode(GUI_DRAWMODE_TRANS) before
+extern int epaper_disp_bitmap(const __FlashStringHelper * p, int x0, int y0);
+#endif
 
 #if 0
 // for debugging purposes
