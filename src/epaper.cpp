@@ -188,6 +188,7 @@ static unsigned char global_bgcolor = -1;
 static unsigned char global_fgcolor = -1;
 static unsigned char global_en_font = -1;
 static unsigned char global_ch_font = -1;
+static unsigned char global_drawmode = GUI_DRAWMODE_NORMAL;
 
 static unsigned char _cmd_buff[CMD_SIZE];
 
@@ -382,10 +383,14 @@ epaper_set_screenrotation(unsigned char mode)
 int
 epaper_set_drawmode(unsigned char mode)
 {
+	int res;
 	unsigned char _cmd_set_drawmode[9] = {FRAME_B, 0x00, 0x0A, CMD_SET_DRAWMODE, 0, FRAME_E0, FRAME_E1, FRAME_E2, FRAME_E3};
+	if (global_drawmode==mode) return 0;
 	_cmd_set_drawmode[4] = mode;
 	_sendcmd(_cmd_set_drawmode, 9);
-	return epaper_wait_ok_error(0);
+	res = epaper_wait_ok_error(0);
+	if (res==0) global_drawmode = mode;
+	return res;
 }
 
 int
@@ -402,14 +407,18 @@ epaper_get_screenrotation(void)
 int
 epaper_set_color(unsigned char colour, unsigned char bkcolour)
 {
+	int res;
 	unsigned char _cmd_set_color[10] = { FRAME_B, 0x00, 0x0B, CMD_SET_COLOR, 0,0,FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	if ((colour==global_fgcolor) && (bkcolour==global_bgcolor)) return 0;
-	global_fgcolor = colour;
-	global_bgcolor = bkcolour;
 	_cmd_set_color[4]= colour;
 	_cmd_set_color[5]= bkcolour;
 	_sendcmd(_cmd_set_color,10);
-	return epaper_wait_ok_error(0);
+	res = epaper_wait_ok_error(0);
+	if (res==0) {
+		global_fgcolor = colour;
+		global_bgcolor = bkcolour;
+		}
+	return res;
 }
 
 int
@@ -429,11 +438,10 @@ epaper_set_en_font(unsigned char font)
 	int res;
 	unsigned char _cmd_set_en_font[9] = { FRAME_B, 0x00, 0x0A, CMD_SET_EN_FONT, 0, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	if (global_en_font==font) return 0;
-	global_en_font = font;
 	_cmd_set_en_font[4] = font;
 	_sendcmd(_cmd_set_en_font, 9);
 	res = epaper_wait_ok_error(0);
-//	if (!res) CurrentFont = font;
+	if (res==0) global_en_font = font;
 	return res;
 }
 
@@ -443,11 +451,10 @@ epaper_set_ch_font(unsigned char font)
 	int res;
 	unsigned char _cmd_set_ch_font[9] = { FRAME_B, 0x00, 0x0A, CMD_SET_CH_FONT, 0, FRAME_E0,FRAME_E1,FRAME_E2,FRAME_E3};
 	if (global_ch_font==font) return 0;
-	global_ch_font = font;
 	_cmd_set_ch_font[4] = font;
 	_sendcmd(_cmd_set_ch_font, 9);
 	res = epaper_wait_ok_error(0);
-//	if (!res) CurrentFont = font;
+	if (res==0) global_ch_font = font;
 	return res;
 }
 
