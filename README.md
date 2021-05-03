@@ -24,6 +24,8 @@ Differences with the official Waveshare driver:
 
 6 - Added epaper_set_drawmode() function for transparent fonts, and epaper_draw_arc() function. (UPDATED FIRMWARE NEEDED!)
 
+7 - Added epaper_disp_string_penwidth() function to increase the pen width of the string displayed. (UPDATED FIRMWARE NEEDED!)
+
 
 Firmware:
 --------
