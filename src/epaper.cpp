@@ -81,7 +81,9 @@ serial_open(const char *serial_name, speed_t baud)
 	cfsetospeed(&newtermios,baud);
 	cfsetispeed(&newtermios,baud);
 
-	newtermios.c_cc[VMIN] = 0;			// read doesn't block
+	// VMIN=0 & VTIME=0    ===> read doesn't block
+	newtermios.c_cc[VMIN] = 0;			
+	newtermios.c_cc[VTIME] = 0;
 
 	newtermios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
 	newtermios.c_oflag &= ~OPOST;
